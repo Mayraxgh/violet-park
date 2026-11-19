@@ -1,529 +1,874 @@
-from machine import Pin, TouchPad, time_pulse_us, reset
-from time import sleep, sleep_ms, sleep_us, ticks_ms, ticks_diff
-import network
-import ujson
-import urequests
-import ntptime
-import time
-import gc
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Violet Park | Asistente de estacionamiento</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='17' fill='%238062c8'/%3E%3Cpath d='M18 50V16h14a10.5 10.5 0 0 1 0 21H18' fill='none' stroke='white' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M51 21a8 8 0 0 1 0 11M57 16a14 14 0 0 1 0 21' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' opacity='.8'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-# ==========================================
-# VIOLET PARK - ESP32 + FIREBASE
-# ==========================================
+<style>
+:root{--morado:#7a5cc7;--morado-osc:#4b3685;--lavanda:#efe9ff;--fondo:#f6f3fc;--texto:#2f2745;--suave:#7b7290;--borde:#e8e1f5;--verde:#3fa57a;--amarillo:#e3a92f;--rojo:#e5576f}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:"Plus Jakarta Sans","Segoe UI",Arial,sans-serif;color:var(--texto);background:radial-gradient(circle at 5% 0,#ece3ff 0,transparent 30%),radial-gradient(circle at 100% 15%,#fbe9f4 0,transparent 26%),var(--fondo)}
+.contenedor{width:min(1180px,93%);margin:auto;padding:26px 0 36px}
+:focus-visible{outline:3px solid var(--morado);outline-offset:2px}
 
-# ---- CAMBIA ESTOS DATOS (no los compartas) ----
-WIFI_SSID = "TU_WIFI"
-WIFI_PASSWORD = "TU_PASSWORD_WIFI"
+header{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:20px}
+.marca{display:flex;align-items:center;gap:13px}
+.logo{width:54px;height:54px;flex:none;filter:drop-shadow(0 8px 14px #8a6bd140)}
+h1{font-size:26px;margin:0;letter-spacing:-.5px;font-weight:800}
+.subtitulo{color:var(--suave);margin:3px 0 0;font-size:13px}
+.conexion{display:flex;align-items:center;gap:9px;padding:10px 16px;border-radius:30px;background:#fff;border:1px solid var(--borde);color:var(--suave);font-size:12px;font-weight:600}
+.punto{width:9px;height:9px;border-radius:50%;background:#d4a0a9}
+.conexion.online{color:#2f7d5c}
+.conexion.online .punto{background:var(--verde);box-shadow:0 0 0 4px #3fa57a26}
 
-API_KEY = "TU_API_KEY"
-DATABASE_URL = "https://violet-park-default-rtdb.firebaseio.com"
+.aviso-esp{display:flex;gap:10px;align-items:center;margin-bottom:14px;padding:13px 16px;border-radius:14px;background:#fff3d8;border:1px solid #f0d9a0;color:#8a6212;font-size:13px;font-weight:600}
+.aviso-esp[hidden]{display:none}
 
-FIREBASE_EMAIL = "TU_CORREO"
-FIREBASE_PASSWORD = "TU_PASSWORD_FIREBASE"
+.bienvenida{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:22px 28px;border-radius:22px;color:#fff;background:linear-gradient(115deg,#8f72dc,#a78ee8 60%,#c9afe9);box-shadow:0 12px 28px #8e71c52e}
+.bienvenida h2{margin:0 0 6px;font-size:21px;font-weight:800}
+.bienvenida p{margin:0;color:#f6f0ff;font-size:14px;max-width:60ch;line-height:1.5}
+.leyenda{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.leyenda span{background:#ffffff26;border:1px solid #ffffff3d;padding:7px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.seccion-titulo{font-size:14px;margin:26px 2px 12px;color:#5c4d78;font-weight:800}
 
-# ==========================================
-# PINES
-# ==========================================
+.panel-estacionamiento{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+.panel{background:#fff;border:1px solid var(--borde);border-radius:22px;padding:20px;box-shadow:0 8px 24px #5540800b;min-width:0}
+.panel h3{margin:0 0 14px;font-size:15px;font-weight:800}
 
-trig = Pin(5, Pin.OUT)
-echo = Pin(18, Pin.IN)
+/* ESCENA */
+.zona-estacionamiento{--acento:#8f7fc0;position:relative;height:370px;border-radius:18px;overflow:hidden;background:linear-gradient(180deg,#30254f,#231b3a);transition:box-shadow .4s}
+.zona-estacionamiento.seguro{--acento:#4fd19a}
+.zona-estacionamiento.precaucion{--acento:#f2bd4b}
+.zona-estacionamiento.alerta{--acento:#ff6f89;box-shadow:inset 0 0 0 2px #ff6f8955}
+.linea-pista{position:absolute;top:0;bottom:0;left:50%;width:210px;transform:translateX(-50%);border-left:3px dashed #5f4e93;border-right:3px dashed #5f4e93;background:#ffffff08}
+.obstaculo{position:absolute;top:22px;left:50%;transform:translateX(-50%);z-index:2;width:180px;height:38px;border-radius:9px;display:grid;place-items:center;background:repeating-linear-gradient(135deg,#e3a92f 0 12px,#2a2142 12px 24px)}
+.obstaculo span{background:#2a2142;color:#f0e9ff;padding:3px 11px;border-radius:6px;font-size:11px;font-weight:700}
+.auto{position:absolute;top:245px;left:50%;margin-left:-40px;z-index:3;width:80px;height:105px;border-radius:24px 24px 16px 16px;background:linear-gradient(135deg,#b79ef0,#7a5cc7);box-shadow:0 10px 20px #00000055;transition:transform .5s ease}
+.auto::before{content:"";position:absolute;top:20px;left:11px;width:58px;height:35px;border-radius:12px;background:#e3daf7;border:3px solid #5f43a6}
+.auto::after{content:"";position:absolute;bottom:15px;left:12px;width:56px;height:24px;border-radius:8px;background:#9479d2}
+.rueda{position:absolute;width:9px;height:23px;background:#17121f;border-radius:4px;top:29px}
+.rueda.izquierda{left:-5px}.rueda.derecha{right:-5px}
+.luz-auto{position:absolute;top:3px;width:15px;height:7px;background:#fff4d6;border-radius:5px;box-shadow:0 0 10px #fff4d6aa}
+.luz-auto.izquierda{left:12px}.luz-auto.derecha{right:12px}
+.sensor-rayos{position:absolute;bottom:100%;left:50%;width:110px;height:46px;transform:translateX(-50%);margin-bottom:3px}
+.rayo{position:absolute;left:50%;bottom:0;transform:translateX(-50%);border:3px solid var(--acento);border-bottom:0;border-radius:100px 100px 0 0;opacity:.4;transition:border-color .3s,opacity .3s}
+.rayo:nth-child(1){width:38px;height:15px}.rayo:nth-child(2){width:72px;height:28px}.rayo:nth-child(3){width:106px;height:43px}
+.seguro .rayo,.precaucion .rayo,.alerta .rayo{opacity:1}
+.alerta .rayo{animation:onda .8s infinite}
+.alerta .rayo:nth-child(2){animation-delay:.15s}.alerta .rayo:nth-child(3){animation-delay:.3s}
+@keyframes onda{50%{opacity:.25}}
+.texto-pista{position:absolute;bottom:9px;left:0;right:0;text-align:center;font-size:11px;color:#9a8dc0}
 
-led_rojo = Pin(13, Pin.OUT)
-led_blanco = Pin(32, Pin.OUT)
-led_amarillo = Pin(25, Pin.OUT)
-led_verde = Pin(26, Pin.OUT)
+/* DISTANCIA */
+.numero{font-size:78px;font-weight:800;letter-spacing:-4px;line-height:1;margin:4px 0 6px;color:var(--morado-osc);font-variant-numeric:tabular-nums}
+.unidad{font-size:18px;color:var(--suave);font-weight:600;letter-spacing:0}
+.detalle{font-size:13px;color:var(--suave);margin:0;min-height:20px}
+.barra-caja{position:relative;margin-top:18px}
+.barra{height:12px;border-radius:20px;background:#eae4f5;overflow:hidden}
+.barra span{display:block;height:100%;width:0;border-radius:20px;background:var(--verde);transition:width .3s,background .3s}
+.marca-barra{position:absolute;top:-3px;width:2px;height:18px;background:#fffc;border-left:1px solid #b9aed0}
+.escala{position:relative;height:16px;margin-top:5px;font-size:10px;color:var(--suave)}
+.escala span{position:absolute;transform:translateX(-50%)}
+.escala span:first-child{transform:none}.escala span:last-child{transform:translateX(-100%)}
+.estado-distancia{margin-top:12px;padding:13px;border-radius:14px;background:#f5f1fc;color:#68558c;font-size:14px;font-weight:800;text-align:center}
 
-buzzer = Pin(19, Pin.OUT)
-touch = TouchPad(Pin(33))
+.grafica-caja{margin-top:16px;padding:12px 12px 8px;border-radius:14px;background:#faf8ff;border:1px solid var(--borde)}
+.grafica-caja p{margin:0 0 6px;font-size:11px;font-weight:700;color:var(--suave);display:flex;justify-content:space-between}
+#grafica{width:100%;height:80px;display:block}
+#lineaGrafica{fill:none;stroke:var(--morado);stroke-width:2.2;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.umbral{stroke:#cfc5e6;stroke-width:1;stroke-dasharray:4 4;vector-effect:non-scaling-stroke}
 
-# ==========================================
-# CONFIGURACION
-# ==========================================
+.zonas{margin-top:12px}
+.fila-zona{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:11px;font-size:12px;border:1px solid transparent}
+.fila-zona i{width:10px;height:10px;border-radius:50%;flex:none}
+.fila-zona .nombre{color:var(--suave);flex:1}
+.fila-zona .valor{font-weight:700;color:#5c4a82}
+.fila-zona.actual{background:#f7f3ff;border-color:var(--borde)}
+.fila-zona.actual .nombre{color:var(--texto);font-weight:700}
+.z-seguro i{background:var(--verde)}.z-precaucion i{background:var(--amarillo)}.z-alerta i{background:var(--rojo)}.z-peligro i{background:#b52f53}
 
-# None = se calibra solo al arrancar (no toques el cable en ese momento).
-# Si no detecta tu toque, pon un numero fijo, por ejemplo 400.
-UMBRAL_TOUCH = None
-HISTERESIS_TOUCH = 25
-DEBUG_TOUCH = False          # True para ver los valores del sensor tactil
+/* TARJETAS */
+.tarjetas{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.tarjeta{--c:#8e7fc0;background:#fff;border:1px solid var(--borde);border-radius:19px;padding:17px;box-shadow:0 8px 24px #5540800b;transition:border-color .3s,box-shadow .3s}
+.led-blanco{--c:#8a97d8}.led-verde{--c:var(--verde)}.led-amarillo{--c:var(--amarillo)}.led-rojo{--c:var(--rojo)}.dispositivo{--c:var(--morado)}
+.tarjeta.on{border-color:color-mix(in srgb,var(--c) 45%,white);box-shadow:0 8px 26px color-mix(in srgb,var(--c) 20%,transparent)}
+.tarjeta-cabecera{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.etiqueta{color:var(--suave);font-size:12px;font-weight:700}
+.icono{width:34px;height:34px;display:grid;place-items:center;border-radius:12px;background:var(--lavanda);color:var(--c);font-size:17px;transition:background .3s,color .3s,box-shadow .3s}
+.tarjeta.on .icono{background:var(--c);color:#fff;box-shadow:0 0 0 5px color-mix(in srgb,var(--c) 22%,transparent)}
+.estado-grande{font-size:19px;font-weight:800;margin:14px 0 4px}
+.nota{color:var(--suave);font-size:11.5px;line-height:1.5;margin:0}
+.estado{display:flex;align-items:center;gap:7px;margin-top:13px;font-size:11px;color:var(--suave);font-weight:700}
+.estado i{width:8px;height:8px;border-radius:50%;background:#d7d2df}
+.estado.activo i{background:var(--verde)}
+.estado.alerta i{background:var(--rojo);box-shadow:0 0 0 4px #e5576f1f}
+.estado.precaucion i{background:var(--amarillo)}
 
-DIST_SEGURA = 20
-DIST_PRECAUCION = 10
-DIST_PELIGRO = 3
+/* INFORMACION */
+.panel-inferior{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:15px}
+.fila{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #f1edf6;font-size:13px;gap:12px}
+.fila:last-child{border-bottom:0}
+.fila span:first-child{color:var(--suave)}
+.valor{font-weight:700;color:#5c4a82;text-align:right}
+.aviso{background:#f8f4ff;border:1px solid #eee6fc;color:#6d5d88;border-radius:14px;padding:14px 16px;font-size:13px;line-height:1.7}
+.aviso p{margin:0 0 10px}.aviso p:last-child{margin:0}
 
-INTERVALO_PARPADEO = 300     # ms
-PERIODO_LECTURA = 150        # ms
-PERIODO_ACTUAL = 1000        # ms (dato en tiempo real)
-PERIODO_HISTORIAL = 5000     # ms (lotes de cambios)
-RENOVAR_TOKEN = 50 * 60 * 1000
+/* HISTORIAL */
+.resumen-historial{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:17px}
+.resumen-card{background:#f8f5ff;border:1px solid #eee6fc;border-radius:15px;padding:15px}
+.resumen-card span{display:block;font-size:12px;color:var(--suave)}
+.resumen-card strong{display:block;font-size:24px;color:var(--morado-osc);margin-top:6px;font-variant-numeric:tabular-nums}
+.historial-acciones{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:15px}
+.en-vivo{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#2f7d5c;background:#e8f6ef;padding:9px 14px;border-radius:11px}
+.en-vivo i{width:8px;height:8px;border-radius:50%;background:var(--verde);animation:onda 1.6s infinite}
+.en-vivo small{font-weight:600;color:var(--suave);font-size:11px}
+.boton-historial{border:none;padding:10px 16px;border-radius:11px;background:var(--morado);color:#fff;font-weight:700;cursor:pointer;font-size:12px;font-family:inherit;transition:background .2s}
+.boton-historial:hover{background:var(--morado-osc)}
+.filtro{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--suave);font-weight:600}
+.filtro select{font-family:inherit;font-size:12px;font-weight:600;padding:9px 12px;border-radius:11px;border:1px solid var(--borde);background:#fff;color:var(--texto)}
+.tabla-contenedor{overflow:auto;max-height:430px;border:1px solid var(--borde);border-radius:14px}
+.tabla-historial{width:100%;border-collapse:collapse;font-size:12.5px;min-width:680px}
+.tabla-historial th{position:sticky;top:0;background:#f7f3fd;color:#6d5d88;padding:12px;text-align:left;font-weight:700}
+.tabla-historial td{padding:12px;border-bottom:1px solid #f1edf6}
+.tabla-historial tbody tr:hover{background:#fbf9ff}
+.etiqueta-historial{display:inline-block;padding:5px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.seguro-h{background:#e2f5eb;color:#2f7d5c}.precaucion-h{background:#fff3d8;color:#946a14}.alerta-h{background:#ffe5eb;color:#b8506b}.peligro-h{background:#fbd6df;color:#a22848}
+.sin-registros{text-align:center;color:var(--suave);padding:28px;font-size:13px}
+footer{text-align:center;color:#9a91a8;font-size:12px;padding-top:26px}
 
-# MicroPython en ESP32 cuenta desde el anio 2000; Firebase/JS usan 1970
-EPOCH_OFFSET = 946684800 if time.gmtime(0)[0] == 2000 else 0
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:860px){
+.panel-estacionamiento,.panel-inferior{grid-template-columns:1fr}
+.tarjetas{grid-template-columns:repeat(2,1fr)}
+header{align-items:flex-start;flex-direction:column}
+.bienvenida{flex-direction:column;align-items:flex-start;padding:22px}
+.leyenda{justify-content:flex-start}.filtro{margin-left:0}}
+@media (max-width:600px){.numero{font-size:64px}}
+@media (max-width:380px){.tarjetas{gap:9px}.tarjeta{padding:12px}}
+</style>
+</head>
 
-# ==========================================
-# VARIABLES
-# ==========================================
+<body>
+<main class="contenedor">
 
-wlan = network.WLAN(network.STA_IF)
+<header>
+    <div class="marca">
+        <svg class="logo" viewBox="0 0 64 64" role="img" aria-label="Logo de Violet Park">
+            <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9a1fa"/><stop offset="1" stop-color="#7a5cc7"/></linearGradient></defs>
+            <rect width="64" height="64" rx="17" fill="url(#lg)"/>
+            <path d="M18 50V16h14a10.5 10.5 0 0 1 0 21H18" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M51 21a8 8 0 0 1 0 11M57 16a14 14 0 0 1 0 21" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/>
+        </svg>
+        <div>
+            <h1>Violet Park</h1>
+            <p class="subtitulo">Asistente de estacionamiento · ESP32</p>
+        </div>
+    </div>
 
-umbral_touch = 400
-touch_activo = False
-touch_valor = 0
-touch_anterior = False
+    <div class="conexion" id="conexion">
+        <span class="punto"></span>
+        <span id="conexionTexto">Conectando...</span>
+    </div>
+</header>
 
-estado_alerta = 0
-ultimo_parpadeo = ticks_ms()
-estado_anterior = None
+<div class="aviso-esp" id="avisoESP" hidden>
+    ⚠ El ESP32 dejó de enviar datos. Revisa que esté encendido y conectado al Wi-Fi.
+</div>
 
-datos_actuales = {}
-pendientes = []
+<section class="bienvenida">
+    <div>
+        <h2>¡Bienvenido a Violet Park! 💜</h2>
+        <p>Estaciona tu automóvil de reversa con ayuda de los sensores de proximidad.</p>
+    </div>
+    <div class="leyenda">
+        <span>Verde: seguro</span>
+        <span>Amarillo: precaución</span>
+        <span>Rojo: alerta</span>
+    </div>
+</section>
 
-token = None
-token_ms = 0
-hora_ok = False
-pulso = 0
-inicio_ms = ticks_ms()
-ultimo_chequeo = ticks_ms()
+<div class="seccion-titulo">Asistente de estacionamiento</div>
 
-# ==========================================
-# APAGAR COMPONENTES
-# ==========================================
+<section class="panel-estacionamiento">
 
-def apagar_todo():
-    trig.value(0)
-    led_rojo.value(0)
-    led_blanco.value(0)
-    led_amarillo.value(0)
-    led_verde.value(0)
-    buzzer.value(0)
+    <article class="panel">
+        <h3>Vista de estacionamiento</h3>
 
-apagar_todo()
+        <div class="zona-estacionamiento" id="zonaAuto">
+            <div class="linea-pista"></div>
+            <div class="obstaculo"><span>OBSTÁCULO</span></div>
 
-# ==========================================
-# WIFI, HORA Y FIREBASE
-# ==========================================
+            <div class="auto" id="auto">
+                <div class="sensor-rayos">
+                    <span class="rayo"></span><span class="rayo"></span><span class="rayo"></span>
+                </div>
+                <span class="rueda izquierda"></span>
+                <span class="rueda derecha"></span>
+                <span class="luz-auto izquierda"></span>
+                <span class="luz-auto derecha"></span>
+            </div>
 
-def conectar_wifi(espera=20000):
+            <span class="texto-pista">Vista ilustrativa de reversa</span>
+        </div>
+    </article>
 
-    wlan.active(True)
+    <article class="panel">
+        <h3>Distancia del obstáculo</h3>
 
-    if wlan.isconnected():
-        return True
+        <div class="numero">
+            <span id="distancia">--</span>
+            <span class="unidad">cm</span>
+        </div>
 
-    print("Conectando a Wi-Fi...")
-    wlan.connect(WIFI_SSID, WIFI_PASSWORD)
+        <p class="detalle" id="distanciaDetalle">Esperando lectura del sensor...</p>
 
-    inicio = ticks_ms()
+        <div class="barra-caja">
+            <div class="barra"><span id="barraDistancia"></span></div>
+            <i class="marca-barra" style="left:3%"></i>
+            <i class="marca-barra" style="left:10%"></i>
+            <i class="marca-barra" style="left:20%"></i>
+            <div class="escala">
+                <span style="left:0">0</span>
+                <span style="left:20%">20</span>
+                <span style="left:50%">50</span>
+                <span style="left:100%">100 cm</span>
+            </div>
+        </div>
 
-    while not wlan.isconnected():
+        <div class="estado-distancia" id="estadoDistancia">Esperando información</div>
 
-        if ticks_diff(ticks_ms(), inicio) > espera:
-            print("Wi-Fi no disponible")
-            return False
+        <div class="grafica-caja">
+            <p><span>Últimos 60 segundos</span><span>0 – 100 cm</span></p>
+            <svg id="grafica" viewBox="0 0 300 80" preserveAspectRatio="none" role="img" aria-label="Gráfica de distancia">
+                <line class="umbral" x1="0" x2="300" y1="64" y2="64"/>
+                <line class="umbral" x1="0" x2="300" y1="72" y2="72"/>
+                <line class="umbral" x1="0" x2="300" y1="77.6" y2="77.6"/>
+                <polyline id="lineaGrafica" points=""/>
+            </svg>
+        </div>
 
-        sleep_ms(300)
+        <div class="zonas">
+            <div class="fila-zona z-seguro" data-zona="seguro"><i></i><span class="nombre">Distancia segura</span><span class="valor">Más de 20 cm</span></div>
+            <div class="fila-zona z-precaucion" data-zona="precaucion"><i></i><span class="nombre">Precaución</span><span class="valor">11 a 20 cm</span></div>
+            <div class="fila-zona z-alerta" data-zona="alerta"><i></i><span class="nombre">Alerta</span><span class="valor">Más de 3 hasta 10 cm</span></div>
+            <div class="fila-zona z-peligro" data-zona="peligro"><i></i><span class="nombre">Peligro</span><span class="valor">3 cm o menos</span></div>
+        </div>
+    </article>
 
-    print("Wi-Fi conectado:", wlan.ifconfig()[0])
-    return True
+</section>
+
+<div class="seccion-titulo">Estado de los componentes</div>
+
+<section class="tarjetas">
+
+    <article class="tarjeta led-blanco">
+        <div class="tarjeta-cabecera"><span class="etiqueta">LED blanco</span><span class="icono">○</span></div>
+        <div class="estado-grande" id="blancoTexto">Apagado</div>
+        <p class="nota">Indicador del sensor táctil</p>
+        <div class="estado" id="blancoEstado"><i></i><span>Sin contacto</span></div>
+    </article>
+
+    <article class="tarjeta led-verde">
+        <div class="tarjeta-cabecera"><span class="etiqueta">LED verde</span><span class="icono">✦</span></div>
+        <div class="estado-grande" id="verdeTexto">Apagado</div>
+        <p class="nota">Distancia segura</p>
+        <div class="estado" id="verdeEstado"><i></i><span>Sin distancia segura</span></div>
+    </article>
+
+    <article class="tarjeta led-amarillo">
+        <div class="tarjeta-cabecera"><span class="etiqueta">LED amarillo</span><span class="icono">●</span></div>
+        <div class="estado-grande" id="amarilloTexto">Apagado</div>
+        <p class="nota">Indicador de precaución</p>
+        <div class="estado" id="amarilloEstado"><i></i><span>Sin precaución</span></div>
+    </article>
+
+    <article class="tarjeta led-rojo">
+        <div class="tarjeta-cabecera"><span class="etiqueta">LED rojo</span><span class="icono">●</span></div>
+        <div class="estado-grande" id="rojoTexto">Apagado</div>
+        <p class="nota">Alerta de proximidad</p>
+        <div class="estado" id="rojoEstado"><i></i><span>Sin alerta</span></div>
+    </article>
+
+    <article class="tarjeta dispositivo">
+        <div class="tarjeta-cabecera"><span class="etiqueta">Buzzer</span><span class="icono">♫</span></div>
+        <div class="estado-grande" id="buzzerTexto">Apagado</div>
+        <p class="nota">Alerta sonora de reversa</p>
+        <div class="estado" id="buzzerEstado"><i></i><span>Sin sonido</span></div>
+    </article>
+
+    <article class="tarjeta dispositivo">
+        <div class="tarjeta-cabecera"><span class="etiqueta">Sensor táctil</span><span class="icono">♡</span></div>
+        <div class="estado-grande" id="tactilTexto">Libre</div>
+        <p class="nota">Detección por contacto</p>
+        <div class="estado" id="tactilEstado"><i></i><span>Esperando contacto</span></div>
+    </article>
+
+</section>
+
+<section class="panel-inferior">
+
+    <article class="panel">
+        <h3>Información del sistema</h3>
+        <div class="fila"><span>Sensor ultrasónico</span><span class="valor" id="sensorEstado">Esperando datos</span></div>
+        <div class="fila"><span>Estado del estacionamiento</span><span class="valor" id="alertaEstado">Sin información</span></div>
+        <div class="fila"><span>Última actualización</span><span class="valor" id="actualizacion">--:--:--</span></div>
+        <div class="fila"><span>Señal Wi-Fi del ESP32</span><span class="valor" id="wifi">--</span></div>
+        <div class="fila"><span>ESP32 encendido hace</span><span class="valor" id="uptime">--</span></div>
+        <div class="fila"><span>Lectura del sensor táctil</span><span class="valor" id="touchValor">--</span></div>
+    </article>
+
+    <article class="panel">
+        <h3>¿Cómo funciona Violet Park?</h3>
+        <div class="aviso">
+            <p>El sensor ultrasónico mide la distancia entre el automóvil y el obstáculo mientras se realiza la maniobra de reversa.</p>
+            <p>Cuando el automóvil se encuentra a más de 20 cm, se activa el LED verde. Al acercarse, se enciende el LED amarillo. Entre más se aproxima, el LED rojo parpadea y el buzzer emite sonidos. A 3 cm o menos, ambos permanecen activados continuamente.</p>
+            <p>El LED blanco indica cuando se detecta contacto con el sensor táctil.</p>
+        </div>
+    </article>
+
+</section>
+
+<div class="seccion-titulo">Historial de estacionamiento</div>
+
+<section class="panel">
+
+    <h3>Registro de proximidad</h3>
+
+    <div class="resumen-historial">
+        <div class="resumen-card"><span>Registros guardados</span><strong id="totalRegistros">0</strong></div>
+        <div class="resumen-card"><span>Distancia mínima</span><strong id="distanciaMinima">-- cm</strong></div>
+        <div class="resumen-card"><span>Última distancia registrada</span><strong id="ultimaDistancia">-- cm</strong></div>
+        <div class="resumen-card"><span>Contactos táctiles</span><strong id="totalContactos">0</strong></div>
+    </div>
+
+    <div class="historial-acciones">
+        <div class="en-vivo"><i></i>Se actualiza solo <small id="cargadoHistorial">Cargando...</small></div>
+
+        <button class="boton-historial" onclick="exportarHistorial()">↓ Descargar CSV</button>
+
+        <label class="filtro">
+            Mostrar
+            <select id="filtroEstado" onchange="pintarHistorial()">
+                <option value="">Todos los estados</option>
+                <option value="SEGURO">Seguro</option>
+                <option value="PRECAUCION">Precaución</option>
+                <option value="ALERTA">Alerta</option>
+                <option value="PELIGRO">Peligro</option>
+            </select>
+        </label>
+    </div>
+
+    <div class="tabla-contenedor">
+        <table class="tabla-historial">
+            <thead>
+                <tr>
+                    <th>Tiempo</th><th>Distancia</th><th>Estado</th><th>Evento</th>
+                    <th>LED rojo</th><th>Buzzer</th><th>Táctil</th>
+                </tr>
+            </thead>
+            <tbody id="tablaHistorial">
+                <tr><td colspan="7" class="sin-registros">Cargando historial...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p class="nota" style="margin-top:14px">
+        Los registros se almacenan en Firebase Realtime Database.
+        Se muestran los cambios de estado y los contactos táctiles guardados por el ESP32.
+    </p>
+
+</section>
+
+<footer>Violet Park · Proyecto de estacionamiento inteligente con ESP32</footer>
+
+</main>
+
+<script>
+
+// ======================================
+// CONFIGURACION FIREBASE
+// ======================================
+
+const FIREBASE_DATABASE = "https://violet-park-default-rtdb.firebaseio.com";
+const RUTA_ACTUAL = FIREBASE_DATABASE + "/violetPark/actual.json";
+const RUTA_HISTORIAL = FIREBASE_DATABASE + "/violetPark/historial.json";
+
+// Solo los ultimos 300 lotes (las claves de Firebase van en orden cronologico)
+const RUTA_HISTORIAL_VIVO = RUTA_HISTORIAL + '?orderBy=%22%24key%22&limitToLast=300';
+
+const $ = id => document.getElementById(id);
+
+let registrosHistorial = [];
+const lecturas = [];
+let ultimaFirma = null;
+let ultimoCambio = Date.now();
+
+const EVENTOS = {
+    ESTADO: "Cambio de estado",
+    CONTACTO: "Contacto táctil",
+    LIBERADO: "Contacto liberado"
+};
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 
-def sincronizar_hora():
+// ======================================
+// CONSULTAR FIREBASE
+// ======================================
 
-    global hora_ok
+async function consultarFirebase(ruta) {
 
-    try:
-        ntptime.host = "pool.ntp.org"
-        ntptime.settime()
-        hora_ok = True
-        print("Hora sincronizada")
+    const sep = ruta.includes("?") ? "&" : "?";
 
-    except Exception as e:
-        print("No se pudo sincronizar la hora:", e)
+    const respuesta = await fetch(
+        ruta + sep + "t=" + Date.now(),
+        { cache: "no-store" }
+    );
 
-
-def ahora_unix():
-    return (time.time() + EPOCH_OFFSET) if hora_ok else 0
-
-
-def autenticar_firebase():
-
-    global token, token_ms
-
-    url = (
-        "https://identitytoolkit.googleapis.com/v1/"
-        "accounts:signInWithPassword?key=" + API_KEY
-    )
-
-    datos = {
-        "email": FIREBASE_EMAIL,
-        "password": FIREBASE_PASSWORD,
-        "returnSecureToken": True
+    if (!respuesta.ok) {
+        throw new Error("No se pudieron consultar los datos");
     }
 
-    r = None
-
-    try:
-        gc.collect()
-
-        r = urequests.post(
-            url,
-            json=datos,
-            headers={"Content-Type": "application/json"}
-        )
-
-        resultado = r.json()
-
-        if r.status_code != 200:
-            print("Error autenticando:", resultado)
-            return False
-
-        token = resultado["idToken"]
-        token_ms = ticks_ms()
-        print("Firebase conectado correctamente")
-        return True
-
-    except Exception as e:
-        print("Error de autenticacion Firebase:", e)
-        return False
-
-    finally:
-        if r is not None:
-            r.close()
-        gc.collect()
+    return await respuesta.json();
+}
 
 
-def firebase_enviar(metodo, ruta, datos):
+// ======================================
+// UTILIDADES
+// ======================================
 
-    global token
+function formatearFecha(segundos) {
 
-    if token is None:
-        return False
+    const n = Number(segundos);
 
-    r = None
+    // Antes de 2020 = el ESP32 aun no tenia la hora sincronizada
+    if (!Number.isFinite(n) || n < 1.6e9) return "Sin hora";
 
-    try:
-        gc.collect()
+    return new Date(n * 1000).toLocaleString("es-MX");
+}
 
-        url = DATABASE_URL + "/" + ruta + ".json?auth=" + token
-        cuerpo = ujson.dumps(datos)
-        cabecera = {"Content-Type": "application/json"}
+function duracion(seg) {
 
-        if metodo == "PUT":
-            r = urequests.put(url, data=cuerpo, headers=cabecera)
-        else:
-            r = urequests.post(url, data=cuerpo, headers=cabecera)
+    seg = Number(seg);
 
-        if r.status_code == 401:
-            token = None
-            print("Token vencido, se renovara")
-            return False
+    const h = Math.floor(seg / 3600);
+    const m = Math.floor((seg % 3600) / 60);
+    const s = seg % 60;
 
-        if r.status_code not in (200, 201, 204):
-            print("Error HTTP:", r.status_code)
-            return False
+    return h > 0 ? h + " h " + m + " min" : m > 0 ? m + " min " + s + " s" : s + " s";
+}
 
-        return True
+function calidadWifi(rssi) {
 
-    except Exception as e:
-        print("Error Firebase:", e)
-        return False
+    const q = rssi > -60 ? "Excelente" : rssi > -70 ? "Buena" : rssi > -80 ? "Regular" : "Débil";
 
-    finally:
-        if r is not None:
-            r.close()
-        gc.collect()
+    return q + " (" + rssi + " dBm)";
+}
 
-# ==========================================
-# SENSOR TACTIL
-# ==========================================
+function aplanar(datos) {
 
-def calibrar_touch():
+    const salida = [];
 
-    global umbral_touch
+    const agregar = v => {
 
-    if UMBRAL_TOUCH is not None:
-        umbral_touch = UMBRAL_TOUCH
-        return
+        if (!v || typeof v !== "object") return;
 
-    total = 0
+        if (Array.isArray(v)) v.forEach(agregar);
+        else if ("distancia" in v || "estado" in v) salida.push(v);
+        else Object.values(v).forEach(agregar);
+    };
 
-    for _ in range(20):
-        total += touch.read()
-        sleep_ms(20)
+    agregar(datos);
 
-    base = total // 20
-    umbral_touch = base - max(40, base * 15 // 100)
-
-    print("Touch base:", base, "| umbral:", umbral_touch)
+    return salida;
+}
 
 
-def leer_touch():
+// ======================================
+// ESTADOS DE COMPONENTES
+// ======================================
 
-    global touch_activo, touch_valor
+function ponerEstado(id, activo, textoActivo, textoInactivo, tipo = "") {
 
-    try:
-        v = (touch.read() + touch.read() + touch.read()) // 3
-    except Exception:
-        return
+    const elemento = $(id);
 
-    touch_valor = v
+    elemento.classList.remove("activo", "alerta", "precaucion");
 
-    # Histeresis: evita que el valor "parpadee" cerca del umbral
-    if v < umbral_touch:
-        touch_activo = True
-    elif v > umbral_touch + HISTERESIS_TOUCH:
-        touch_activo = False
-
-    if DEBUG_TOUCH:
-        print("touch:", v, "activo:", touch_activo)
-
-# ==========================================
-# SENSOR ULTRASONICO
-# ==========================================
-
-def medir_distancia():
-
-    lecturas = []
-
-    for _ in range(3):
-
-        trig.value(0)
-        sleep_us(2)
-        trig.value(1)
-        sleep_us(10)
-        trig.value(0)
-
-        try:
-            duracion = time_pulse_us(echo, 1, 30000)
-
-            if duracion > 0:
-                d = duracion / 58.0
-
-                if 2 <= d <= 400:
-                    lecturas.append(d)
-
-        except OSError:
-            pass
-
-        sleep_ms(25)
-
-    if len(lecturas) < 2:
-        return None
-
-    lecturas.sort()
-
-    return round(lecturas[len(lecturas) // 2], 1)
-
-# ==========================================
-# ACTUALIZAR COMPONENTES Y REGISTRAR CAMBIOS
-# ==========================================
-
-def actualizar_sensores():
-
-    global estado_alerta, ultimo_parpadeo
-    global datos_actuales, estado_anterior, touch_anterior
-
-    ahora = ticks_ms()
-
-    leer_touch()
-    led_blanco.value(1 if touch_activo else 0)
-
-    distancia = medir_distancia()
-
-    led_verde.value(0)
-    led_amarillo.value(0)
-    led_rojo.value(0)
-    buzzer.value(0)
-
-    if distancia is None:
-        estado = "SIN_LECTURA"
-        estado_alerta = 0
-
-    elif distancia > DIST_SEGURA:
-        estado = "SEGURO"
-        led_verde.value(1)
-        estado_alerta = 0
-
-    elif distancia > DIST_PRECAUCION:
-        estado = "PRECAUCION"
-        led_amarillo.value(1)
-        estado_alerta = 0
-
-    elif distancia > DIST_PELIGRO:
-        estado = "ALERTA"
-
-        if ticks_diff(ahora, ultimo_parpadeo) >= INTERVALO_PARPADEO:
-            ultimo_parpadeo = ahora
-            estado_alerta = 1 - estado_alerta
-
-        led_rojo.value(estado_alerta)
-        buzzer.value(estado_alerta)
-
-    else:
-        estado = "PELIGRO"
-        led_rojo.value(1)
-        buzzer.value(1)
-        estado_alerta = 1
-
-    datos_actuales = {
-        "distancia": distancia,
-        "estado": estado,
-        "led_rojo": bool(led_rojo.value()),
-        "led_blanco": bool(led_blanco.value()),
-        "led_amarillo": bool(led_amarillo.value()),
-        "led_verde": bool(led_verde.value()),
-        "buzzer": bool(buzzer.value()),
-        "tactil": touch_activo,
-        "touch_valor": touch_valor
+    if (activo) {
+        elemento.classList.add(tipo || "activo");
     }
 
-    # Registrar cambios de estado Y contactos tactiles
-    if distancia is not None:
+    elemento.querySelector("span").textContent =
+        activo ? textoActivo : textoInactivo;
 
-        evento = None
+    elemento.closest(".tarjeta").classList.toggle("on", activo);
+}
 
-        if estado != estado_anterior:
-            evento = "ESTADO"
-        elif touch_activo != touch_anterior:
-            evento = "CONTACTO" if touch_activo else "LIBERADO"
+function actualizarLED(id, activo, nombre) {
 
-        if evento:
+    $(id + "Texto").textContent = activo ? "Activo" : "Apagado";
 
-            pendientes.append({
-                "segundos": ahora_unix(),
-                "distancia": distancia,
-                "estado": estado,
-                "evento": evento,
-                "led_rojo": bool(led_rojo.value()),
-                "led_blanco": bool(led_blanco.value()),
-                "led_amarillo": bool(led_amarillo.value()),
-                "led_verde": bool(led_verde.value()),
-                "buzzer": bool(buzzer.value()),
-                "tactil": touch_activo
-            })
+    ponerEstado(
+        id + "Estado",
+        activo,
+        nombre,
+        "Apagado",
+        id === "amarillo" ? "precaucion" :
+        id === "rojo" ? "alerta" : "activo"
+    );
+}
 
-            if len(pendientes) > 50:
-                pendientes.pop(0)
+function marcarZona(nombre) {
 
-            print(evento, estado, distancia, "cm | tactil:", touch_activo)
-
-        estado_anterior = estado
-        touch_anterior = touch_activo
-
-# ==========================================
-# ENVIAR A FIREBASE
-# ==========================================
-
-def enviar_actual():
-
-    global pulso
-
-    if not datos_actuales:
-        return
-
-    pulso += 1
-
-    datos_actuales["pulso"] = pulso
-    datos_actuales["actualizacion"] = ahora_unix()
-    datos_actuales["uptime"] = ticks_diff(ticks_ms(), inicio_ms) // 1000
-
-    try:
-        datos_actuales["wifi_rssi"] = wlan.status("rssi")
-    except Exception:
-        pass
-
-    firebase_enviar("PUT", "violetPark/actual", datos_actuales)
+    document.querySelectorAll(".fila-zona").forEach(fila => {
+        fila.classList.toggle("actual", fila.dataset.zona === nombre);
+    });
+}
 
 
-def enviar_historial():
+// ======================================
+// GRAFICA EN VIVO (ultimos 60 s)
+// ======================================
 
-    if not pendientes:
-        return
+function dibujarGrafica() {
 
-    lote = pendientes[:]
+    const W = 300, H = 80, MAX = 100, N = 60;
 
-    if firebase_enviar("POST", "violetPark/historial", lote):
-        del pendientes[:len(lote)]
-        print("Historial guardado:", len(lote), "registros")
-    else:
-        print("Registros conservados para reintentar")
+    const puntos = [];
 
+    lecturas.forEach((v, i) => {
 
-def mantener_conexion(ahora):
+        if (v === null) return;
 
-    global ultimo_chequeo
+        const x = (i + N - lecturas.length) * W / (N - 1);
+        const y = H - Math.min(MAX, Math.max(0, v)) / MAX * H;
 
-    if ticks_diff(ahora, ultimo_chequeo) < 15000:
-        return
+        puntos.push(x.toFixed(1) + "," + y.toFixed(1));
+    });
 
-    ultimo_chequeo = ahora
+    $("lineaGrafica").setAttribute("points", puntos.join(" "));
+}
 
-    if not wlan.isconnected():
-        print("Wi-Fi perdido, reconectando...")
-        conectar_wifi(8000)
-        return
+function registrarLectura(valor) {
 
-    if not hora_ok:
-        sincronizar_hora()
+    lecturas.push(valor);
 
-    if token is None or ticks_diff(ahora, token_ms) > RENOVAR_TOKEN:
-        autenticar_firebase()
+    if (lecturas.length > 60) lecturas.shift();
 
-# ==========================================
-# PROGRAMA PRINCIPAL
-# ==========================================
-
-def main():
-
-    calibrar_touch()
-
-    if conectar_wifi():
-        sincronizar_hora()
-        autenticar_firebase()
-
-    print("Violet Park en marcha")
-
-    t_lectura = ticks_ms()
-    t_actual = ticks_ms()
-    t_historial = ticks_ms()
-    touch_enviado = False
-
-    while True:
-
-        ahora = ticks_ms()
-
-        if ticks_diff(ahora, t_lectura) >= PERIODO_LECTURA:
-            actualizar_sensores()
-            t_lectura = ahora
-
-        if token is not None and wlan.isconnected():
-
-            # El contacto tactil se envia de inmediato
-            if (touch_activo != touch_enviado
-                    or ticks_diff(ahora, t_actual) >= PERIODO_ACTUAL):
-
-                enviar_actual()
-                touch_enviado = touch_activo
-                t_actual = ticks_ms()
-
-            if (pendientes
-                    and ticks_diff(ahora, t_historial) >= PERIODO_HISTORIAL):
-
-                enviar_historial()
-                t_historial = ticks_ms()
-
-        mantener_conexion(ahora)
-
-        sleep_ms(10)
+    dibujarGrafica();
+}
 
 
-try:
-    main()
+// ======================================
+// MONITOR EN TIEMPO REAL
+// ======================================
 
-except Exception as error:
-    print("Error en Violet Park:", error)
-    apagar_todo()
-    sleep(5)
-    reset()
+async function actualizar() {
 
-finally:
-    apagar_todo()
+    try {
+
+        const d = await consultarFirebase(RUTA_ACTUAL);
+
+        if (!d) {
+            throw new Error("No hay datos actuales en Firebase");
+        }
+
+        // ESP32 activo? (cada envio trae un "pulso" distinto)
+        const firma = d.pulso ?? d.actualizacion;
+
+        if (firma !== ultimaFirma) {
+            ultimaFirma = firma;
+            ultimoCambio = Date.now();
+            $("actualizacion").textContent = new Date().toLocaleTimeString("es-MX");
+        }
+
+        const sinSenal = Date.now() - ultimoCambio > 6000;
+
+        $("avisoESP").hidden = !sinSenal;
+        $("conexion").classList.toggle("online", !sinSenal);
+        $("conexionTexto").textContent =
+            sinSenal ? "ESP32 sin enviar datos" : "En vivo · Firebase";
+
+        const distanciaValida =
+            d.distancia !== null &&
+            d.distancia !== undefined &&
+            Number.isFinite(Number(d.distancia));
+
+        const zona = $("zonaAuto");
+
+        if (!distanciaValida) {
+
+            $("distancia").textContent = "--";
+            $("distanciaDetalle").textContent = "No se recibió una lectura válida";
+            $("barraDistancia").style.width = "0%";
+            $("barraDistancia").style.background = "#d7d2df";
+            $("estadoDistancia").textContent = "Esperando una lectura del sensor";
+            $("sensorEstado").textContent = "Sin lectura";
+            $("alertaEstado").textContent = "Sin información";
+            $("auto").style.transform = "translateY(0px)";
+            zona.className = "zona-estacionamiento";
+            marcarZona(null);
+            registrarLectura(null);
+
+        } else {
+
+            const distancia = Number(d.distancia);
+
+            $("distancia").textContent = distancia.toFixed(1);
+            $("sensorEstado").textContent = "Funcionando";
+
+            $("barraDistancia").style.width =
+                Math.max(0, Math.min(100, distancia)) + "%";
+
+            const avance = Math.max(0, Math.min(140, (100 - distancia) * 1.4));
+
+            $("auto").style.transform = "translateY(-" + avance + "px)";
+
+            registrarLectura(distancia);
+
+            if (distancia > 20) {
+
+                zona.className = "zona-estacionamiento seguro";
+                $("barraDistancia").style.background = "#3fa57a";
+                $("distanciaDetalle").textContent = "El automóvil se encuentra a una distancia segura";
+                $("estadoDistancia").textContent = "Distancia segura";
+                $("alertaEstado").textContent = "Normal";
+                marcarZona("seguro");
+
+            } else if (distancia > 10) {
+
+                zona.className = "zona-estacionamiento precaucion";
+                $("barraDistancia").style.background = "#e3a92f";
+                $("distanciaDetalle").textContent = "El automóvil se está acercando al obstáculo";
+                $("estadoDistancia").textContent = "¡Precaución!";
+                $("alertaEstado").textContent = "Precaución";
+                marcarZona("precaucion");
+
+            } else if (distancia > 3) {
+
+                zona.className = "zona-estacionamiento alerta";
+                $("barraDistancia").style.background = "#e5576f";
+                $("distanciaDetalle").textContent = "¡Muy cerca! Reduce la velocidad";
+                $("estadoDistancia").textContent = "¡Alerta de proximidad!";
+                $("alertaEstado").textContent = "Alerta";
+                marcarZona("alerta");
+
+            } else {
+
+                zona.className = "zona-estacionamiento alerta";
+                $("barraDistancia").style.background = "#e5576f";
+                $("distanciaDetalle").textContent = "¡Detente! El obstáculo está demasiado cerca";
+                $("estadoDistancia").textContent = "¡PELIGRO! DETENERSE";
+                $("alertaEstado").textContent = "Peligro";
+                marcarZona("peligro");
+            }
+        }
+
+        actualizarLED("blanco", !!d.led_blanco, "Contacto detectado");
+        actualizarLED("verde", !!d.led_verde, "Distancia segura");
+        actualizarLED("amarillo", !!d.led_amarillo, "Precaución");
+        actualizarLED("rojo", !!d.led_rojo, "Alerta activa");
+
+        $("buzzerTexto").textContent = d.buzzer ? "Activo" : "Apagado";
+        ponerEstado("buzzerEstado", !!d.buzzer, "Emitiendo sonido", "Sin sonido", "alerta");
+
+        $("tactilTexto").textContent = d.tactil ? "Detectado" : "Libre";
+        ponerEstado("tactilEstado", !!d.tactil, "Hay contacto", "Esperando contacto");
+
+        // DATOS EXTRA DEL ESP32
+
+        $("wifi").textContent = d.wifi_rssi != null ? calidadWifi(d.wifi_rssi) : "--";
+        $("uptime").textContent = d.uptime != null ? duracion(d.uptime) : "--";
+        $("touchValor").textContent = d.touch_valor ?? "--";
+
+    } catch (error) {
+
+        $("conexion").classList.remove("online");
+        $("conexionTexto").textContent = "Sin conexión con Firebase";
+        $("sensorEstado").textContent = "Revisar conexión";
+
+        console.log("Error de Firebase:", error);
+    }
+}
+
+
+// ======================================
+// HISTORIAL (se actualiza solo)
+// ======================================
+
+async function cargarHistorial() {
+
+    try {
+
+        const datos = await consultarFirebase(RUTA_HISTORIAL_VIVO);
+
+        registrosHistorial = aplanar(datos);
+
+        $("totalRegistros").textContent = registrosHistorial.length;
+
+        const distancias = registrosHistorial
+            .filter(r => r.distancia != null)
+            .map(r => Number(r.distancia))
+            .filter(Number.isFinite);
+
+        $("distanciaMinima").textContent =
+            distancias.length ? Math.min(...distancias).toFixed(1) + " cm" : "-- cm";
+
+        const ultimo = registrosHistorial[registrosHistorial.length - 1];
+
+        $("ultimaDistancia").textContent =
+            ultimo && ultimo.distancia != null
+                ? Number(ultimo.distancia).toFixed(1) + " cm"
+                : "-- cm";
+
+        $("totalContactos").textContent =
+            registrosHistorial.filter(r => r.evento === "CONTACTO").length;
+
+        $("cargadoHistorial").textContent =
+            "· actualizado " + new Date().toLocaleTimeString("es-MX");
+
+        pintarHistorial();
+
+    } catch (error) {
+
+        $("tablaHistorial").innerHTML = `
+            <tr><td colspan="7" class="sin-registros">
+                No se pudo cargar el historial de Firebase. Comprueba la conexión.
+            </td></tr>`;
+
+        console.log("Error de historial:", error);
+    }
+}
+
+function pintarHistorial() {
+
+    const tabla = $("tablaHistorial");
+    const filtro = $("filtroEstado").value;
+
+    if (registrosHistorial.length === 0) {
+
+        tabla.innerHTML = `
+            <tr><td colspan="7" class="sin-registros">
+                Todavía no hay estacionamientos registrados.
+            </td></tr>`;
+
+        return;
+    }
+
+    const lista = registrosHistorial
+        .filter(r => !filtro || r.estado === filtro)
+        .slice()
+        .reverse();
+
+    if (lista.length === 0) {
+
+        tabla.innerHTML = `
+            <tr><td colspan="7" class="sin-registros">
+                No hay registros con ese estado.
+            </td></tr>`;
+
+        return;
+    }
+
+    const clases = {
+        PRECAUCION: "precaucion-h",
+        ALERTA: "alerta-h",
+        PELIGRO: "peligro-h"
+    };
+
+    tabla.innerHTML = lista.map(r => `
+        <tr>
+            <td>${formatearFecha(r.segundos)}</td>
+            <td>${r.distancia != null ? Number(r.distancia).toFixed(1) + " cm" : "--"}</td>
+            <td><span class="etiqueta-historial ${clases[r.estado] || "seguro-h"}">${esc(r.estado)}</span></td>
+            <td>${EVENTOS[r.evento] || EVENTOS.ESTADO}</td>
+            <td>${r.led_rojo ? "Activo" : "Apagado"}</td>
+            <td>${r.buzzer ? "Activo" : "Apagado"}</td>
+            <td>${r.tactil ? "Detectado" : "Libre"}</td>
+        </tr>`).join("");
+}
+
+// Firebase avisa al instante cuando el ESP32 guarda algo nuevo
+function escucharHistorial() {
+
+    if (!window.EventSource) return;
+
+    let espera;
+
+    const recargar = () => {
+        clearTimeout(espera);
+        espera = setTimeout(cargarHistorial, 400);
+    };
+
+    const flujo = new EventSource(RUTA_HISTORIAL_VIVO);
+
+    flujo.addEventListener("put", recargar);
+    flujo.addEventListener("patch", recargar);
+}
+
+
+// ======================================
+// DESCARGAR HISTORIAL CSV
+// ======================================
+
+function exportarHistorial() {
+
+    if (registrosHistorial.length === 0) {
+        alert("No hay registros para descargar.");
+        return;
+    }
+
+    const encabezado = [
+        "Tiempo", "Distancia", "Estado", "Evento", "LED rojo",
+        "LED blanco", "LED amarillo", "LED verde", "Buzzer", "Tactil"
+    ];
+
+    const filas = registrosHistorial.map(r => [
+        formatearFecha(r.segundos), r.distancia, r.estado,
+        EVENTOS[r.evento] || EVENTOS.ESTADO,
+        r.led_rojo, r.led_blanco, r.led_amarillo, r.led_verde,
+        r.buzzer, r.tactil
+    ]);
+
+    const celda = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+
+    const contenido = [encabezado, ...filas]
+        .map(fila => fila.map(celda).join(","))
+        .join("\n");
+
+    const archivo = new Blob(
+        ["\uFEFF" + contenido],
+        { type: "text/csv;charset=utf-8;" }
+    );
+
+    const enlace = document.createElement("a");
+
+    enlace.href = URL.createObjectURL(archivo);
+    enlace.download = "historial_violet_park.csv";
+    enlace.click();
+
+    URL.revokeObjectURL(enlace.href);
+}
+
+
+// ======================================
+// INICIAR
+// ======================================
+
+actualizar();
+cargarHistorial();
+escucharHistorial();
+
+setInterval(actualizar, 1000);
+setInterval(cargarHistorial, 10000);   // respaldo por si falla el aviso en vivo
+
+</script>
+
+</body>
+</html>
