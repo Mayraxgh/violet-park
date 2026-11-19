@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Violet Park | Asistente de estacionamiento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+:root {
+    --lila: #b9a3f5;
+    --morado: #7a5cc7;
+    --morado-oscuro: #4b3685;
+    --ciruela: #2a2142;
+    --lavanda: #efe9ff;
+    --fondo: #f6f3fc;
+    --texto: #2f2745;
+    --suave: #7b7290;
+    --borde: #e8e1f5;
+    --verde: #3fa57a;
+    --amarillo: #e3a92f;
+    --rojo: #e5576f;
+    --blanco-led: #9aa4d6;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Plus Jakarta Sans", "Segoe UI", Arial, sans-serif;
+    color: var(--texto);
+    background:
+        radial-gradient(circle at 5% 0, #ece3ff 0, transparent 30%),
+        radial-gradient(circle at 100% 15%, #fbe9f4 0, transparent 26%),
+        var(--fondo);
+}
+
+.contenedor {
+    width: min(1180px, 93%);
+    margin: auto;
+    padding: 26px 0 36px;
+}
+
+:focus-visible {
+    outline: 3px solid var(--morado);
+    outline-offset: 2px;
+}
+
+/* ENCABEZADO */
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 22px;
+}
+
+.marca { display: flex; align-items: center; gap: 13px; }
+
+.logo {
+    width: 50px;
+    height: 50px;
+    display: grid;
+    place-items: center;
+    border-radius: 16px;
+    color: white;
+    font-size: 25px;
+    background: linear-gradient(135deg, #b9a1fa, #7d5fd0);
+    box-shadow: 0 8px 20px #8a6bd137;
+}
+
+h1 { font-size: 26px; margin: 0; letter-spacing: -.5px; font-weight: 800; }
+
+.subtitulo { color: var(--suave); margin: 3px 0 0; font-size: 13px; }
+
+.conexion {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 16px;
+    border-radius: 30px;
+    background: white;
+    border: 1px solid var(--borde);
+    color: var(--suave);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.punto { width: 9px; height: 9px; border-radius: 50%; background: #d4a0a9; }
+
+.conexion.online { color: #2f7d5c; }
+.conexion.online .punto {
+    background: var(--verde);
+    box-shadow: 0 0 0 4px #3fa57a26;
+}
+
+/* BIENVENIDA */
+
+.bienvenida {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 22px 28px;
+    border-radius: 22px;
+    color: white;
+    margin-bottom: 8px;
+    background: linear-gradient(115deg, #8f72dc, #a78ee8 60%, #c9afe9);
+    box-shadow: 0 12px 28px #8e71c52e;
+}
+
+.bienvenida h2 { margin: 0 0 6px; font-size: 21px; font-weight: 800; }
+.bienvenida p { margin: 0; color: #f6f0ff; font-size: 14px; max-width: 60ch; line-height: 1.5; }
+
+.pasos { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.pasos span {
+    background: #ffffff26;
+    border: 1px solid #ffffff3d;
+    padding: 7px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.seccion-titulo {
+    font-size: 14px;
+    margin: 26px 2px 12px;
+    color: #5c4d78;
+    font-weight: 800;
+}
+
+/* PANELES */
+
+.panel-estacionamiento {
+    display: grid;
+    grid-template-columns: 1.15fr .85fr;
+    gap: 16px;
+}
+
+.panel {
+    background: white;
+    border: 1px solid var(--borde);
+    border-radius: 22px;
+    padding: 20px;
+    box-shadow: 0 8px 24px #5540800b;
+    min-width: 0;
+}
+
+.panel h3 { margin: 0 0 14px; font-size: 15px; font-weight: 800; }
+
+/* ESCENA */
+
+.zona-estacionamiento {
+    --acento: #8f7fc0;
+    position: relative;
+    height: 370px;
+    border-radius: 18px;
+    overflow: hidden;
+    background: linear-gradient(180deg, #30254f, #231b3a);
+    transition: box-shadow .4s;
+}
+
+.zona-estacionamiento.seguro { --acento: #4fd19a; }
+.zona-estacionamiento.precaucion { --acento: #f2bd4b; }
+.zona-estacionamiento.alerta { --acento: #ff6f89; }
+.zona-estacionamiento.alerta { box-shadow: inset 0 0 0 2px #ff6f8955; }
+
+.linea-pista {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 210px;
+    transform: translateX(-50%);
+    border-left: 3px dashed #5f4e93;
+    border-right: 3px dashed #5f4e93;
+    background: #ffffff08;
+}
+
+.obstaculo {
+    position: absolute;
+    top: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    width: 180px;
+    height: 38px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    background: repeating-linear-gradient(135deg, #e3a92f 0 12px, #2a2142 12px 24px);
+}
+
+.obstaculo span {
+    background: #2a2142;
+    color: #f0e9ff;
+    padding: 3px 11px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.auto {
+    position: absolute;
+    top: 245px;
+    left: 50%;
+    margin-left: -40px;
+    z-index: 3;
+    width: 80px;
+    height: 105px;
+    border-radius: 24px 24px 16px 16px;
+    background: linear-gradient(135deg, #b79ef0, #7a5cc7);
+    box-shadow: 0 10px 20px #00000055;
+    transition: transform .5s ease;
+}
+
+.auto::before {
+    content: "";
+    position: absolute;
+    top: 20px;
+    left: 11px;
+    width: 58px;
+    height: 35px;
+    border-radius: 12px;
+    background: #e3daf7;
+    border: 3px solid #5f43a6;
+}
+
+.auto::after {
+    content: "";
+    position: absolute;
+    bottom: 15px;
+    left: 12px;
+    width: 56px;
+    height: 24px;
+    border-radius: 8px;
+    background: #9479d2;
+}
+
+.rueda {
+    position: absolute;
+    width: 9px;
+    height: 23px;
+    background: #17121f;
+    border-radius: 4px;
+    top: 29px;
+}
+.rueda.izquierda { left: -5px; }
+.rueda.derecha { right: -5px; }
+
+.luz-auto {
+    position: absolute;
+    top: 3px;
+    width: 15px;
+    height: 7px;
+    background: #fff4d6;
+    border-radius: 5px;
+    box-shadow: 0 0 10px #fff4d6aa;
+}
+.luz-auto.izquierda { left: 12px; }
+.luz-auto.derecha { right: 12px; }
+
+/* ARCOS DEL SENSOR (se mueven con el auto) */
+
+.sensor-rayos {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    width: 110px;
+    height: 46px;
+    transform: translateX(-50%);
+    margin-bottom: 3px;
+}
+
+.rayo {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+    border: 3px solid var(--acento);
+    border-bottom: 0;
+    border-radius: 100px 100px 0 0;
+    opacity: .4;
+    transition: border-color .3s, opacity .3s;
+}
+.rayo:nth-child(1) { width: 38px; height: 15px; }
+.rayo:nth-child(2) { width: 72px; height: 28px; }
+.rayo:nth-child(3) { width: 106px; height: 43px; }
+
+.zona-estacionamiento.seguro .rayo,
+.zona-estacionamiento.precaucion .rayo,
+.zona-estacionamiento.alerta .rayo { opacity: 1; }
+
+.zona-estacionamiento.alerta .rayo { animation: onda .8s infinite; }
+.zona-estacionamiento.alerta .rayo:nth-child(2) { animation-delay: .15s; }
+.zona-estacionamiento.alerta .rayo:nth-child(3) { animation-delay: .3s; }
+
+@keyframes onda { 50% { opacity: .25; } }
+
+.texto-pista {
+    position: absolute;
+    bottom: 9px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 11px;
+    color: #9a8dc0;
+}
+
+/* LECTURA DE DISTANCIA */
+
+.numero {
+    font-size: 78px;
+    font-weight: 800;
+    letter-spacing: -4px;
+    line-height: 1;
+    margin: 4px 0 6px;
+    color: var(--morado-oscuro);
+    font-variant-numeric: tabular-nums;
+}
+
+.unidad {
+    font-size: 18px;
+    color: var(--suave);
+    font-weight: 600;
+    letter-spacing: 0;
+}
+
+.detalle { font-size: 13px; color: var(--suave); margin: 0; min-height: 20px; }
+
+.barra-caja { position: relative; margin-top: 20px; }
+
+.barra {
+    height: 12px;
+    border-radius: 20px;
+    background: #eae4f5;
+    overflow: hidden;
+}
+
+.barra span {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: 20px;
+    background: var(--verde);
+    transition: width .3s, background .3s;
+}
+
+.marca-barra {
+    position: absolute;
+    top: -3px;
+    width: 2px;
+    height: 18px;
+    background: #ffffffcc;
+    border-left: 1px solid #b9aed0;
+}
+
+.escala {
+    position: relative;
+    height: 16px;
+    margin-top: 5px;
+    font-size: 10px;
+    color: var(--suave);
+}
+.escala span { position: absolute; transform: translateX(-50%); }
+.escala span:first-child { transform: none; }
+.escala span:last-child { transform: translateX(-100%); }
+
+.estado-distancia {
+    margin-top: 14px;
+    padding: 14px;
+    border-radius: 14px;
+    background: #f5f1fc;
+    color: #68558c;
+    font-size: 14px;
+    font-weight: 800;
+    text-align: center;
+}
+
+.zonas { margin-top: 16px; }
+
+.fila-zona {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 11px;
+    border-radius: 11px;
+    font-size: 12px;
+    border: 1px solid transparent;
+}
+
+.fila-zona i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.fila-zona .nombre { color: var(--suave); flex: 1; }
+.fila-zona .valor { font-weight: 700; color: #5c4a82; }
+.fila-zona.actual { background: #f7f3ff; border-color: var(--borde); }
+.fila-zona.actual .nombre { color: var(--texto); font-weight: 700; }
+
+.z-seguro i { background: var(--verde); }
+.z-precaucion i { background: var(--amarillo); }
+.z-alerta i { background: var(--rojo); }
+.z-peligro i { background: #b52f53; }
+
+/* TARJETAS DE COMPONENTES */
+
+.tarjetas {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.tarjeta {
+    --c: #8e7fc0;
+    background: white;
+    border: 1px solid var(--borde);
+    border-radius: 19px;
+    padding: 17px;
+    box-shadow: 0 8px 24px #5540800b;
+    transition: border-color .3s, box-shadow .3s;
+}
+
+.led-blanco { --c: #8a97d8; }
+.led-verde { --c: var(--verde); }
+.led-amarillo { --c: var(--amarillo); }
+.led-rojo { --c: var(--rojo); }
+.dispositivo { --c: var(--morado); }
+
+.tarjeta.on {
+    border-color: color-mix(in srgb, var(--c) 45%, white);
+    box-shadow: 0 8px 26px color-mix(in srgb, var(--c) 20%, transparent);
+}
+
+.tarjeta-cabecera { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+.etiqueta { color: var(--suave); font-size: 12px; font-weight: 700; }
+
+.icono {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: var(--lavanda);
+    color: var(--c);
+    font-size: 17px;
+    transition: background .3s, color .3s, box-shadow .3s;
+}
+
+.tarjeta.on .icono {
+    background: var(--c);
+    color: white;
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--c) 22%, transparent);
+}
+
+.estado-grande { font-size: 19px; font-weight: 800; margin: 14px 0 4px; }
+
+.nota { color: var(--suave); font-size: 11.5px; line-height: 1.5; margin: 0; }
+
+.estado {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 13px;
+    font-size: 11px;
+    color: var(--suave);
+    font-weight: 700;
+}
+
+.estado i { width: 8px; height: 8px; border-radius: 50%; background: #d7d2df; }
+.estado.activo i { background: var(--verde); }
+.estado.alerta i { background: var(--rojo); box-shadow: 0 0 0 4px #e5576f1f; }
+.estado.precaucion i { background: var(--amarillo); }
+
+/* INFORMACION */
+
+.panel-inferior {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 15px;
+}
+
+.fila {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f1edf6;
+    font-size: 13px;
+    gap: 12px;
+}
+.fila:last-child { border-bottom: 0; }
+.fila span:first-child { color: var(--suave); }
+.valor { font-weight: 700; color: #5c4a82; text-align: right; }
+
+.aviso {
+    background: #f8f4ff;
+    border: 1px solid #eee6fc;
+    color: #6d5d88;
+    border-radius: 14px;
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.7;
+}
+.aviso p { margin: 0 0 10px; }
+.aviso p:last-child { margin: 0; }
+
+/* HISTORIAL */
+
+.resumen-historial {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 17px;
+}
+
+.resumen-card {
+    background: #f8f5ff;
+    border: 1px solid #eee6fc;
+    border-radius: 15px;
+    padding: 15px;
+}
+.resumen-card span { display: block; font-size: 12px; color: var(--suave); }
+.resumen-card strong {
+    display: block;
+    font-size: 24px;
+    color: var(--morado-oscuro);
+    margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+.historial-acciones {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.boton-historial {
+    border: none;
+    padding: 10px 16px;
+    border-radius: 11px;
+    background: #eee8ff;
+    color: #5c4a82;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: background .2s;
+}
+.boton-historial:hover { background: #dfd3fa; }
+.boton-historial.principal { background: var(--morado); color: white; }
+.boton-historial.principal:hover { background: var(--morado-oscuro); }
+
+.filtro {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--suave);
+    font-weight: 600;
+}
+
+.filtro select {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 9px 12px;
+    border-radius: 11px;
+    border: 1px solid var(--borde);
+    background: white;
+    color: var(--texto);
+}
+
+.tabla-contenedor {
+    overflow: auto;
+    max-height: 430px;
+    border: 1px solid var(--borde);
+    border-radius: 14px;
+}
+
+.tabla-historial {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    min-width: 600px;
+}
+
+.tabla-historial th {
+    position: sticky;
+    top: 0;
+    background: #f7f3fd;
+    color: #6d5d88;
+    padding: 12px;
+    text-align: left;
+    font-weight: 700;
+}
+
+.tabla-historial td { padding: 12px; border-bottom: 1px solid #f1edf6; }
+.tabla-historial tbody tr:hover { background: #fbf9ff; }
+
+.etiqueta-historial {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.seguro-h { background: #e2f5eb; color: #2f7d5c; }
+.precaucion-h { background: #fff3d8; color: #946a14; }
+.alerta-h { background: #ffe5eb; color: #b8506b; }
+.peligro-h { background: #fbd6df; color: #a22848; }
+
+.sin-registros { text-align: center; color: var(--suave); padding: 28px; font-size: 13px; }
+
+footer { text-align: center; color: #9a91a8; font-size: 12px; padding-top: 26px; }
+
+@media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+}
+
+@media (max-width: 860px) {
+    .panel-estacionamiento, .panel-inferior { grid-template-columns: 1fr; }
+    .tarjetas { grid-template-columns: repeat(2, 1fr); }
+    header { align-items: flex-start; flex-direction: column; }
+    .bienvenida { flex-direction: column; align-items: flex-start; padding: 22px; }
+    .pasos { justify-content: flex-start; }
+    .filtro { margin-left: 0; }
+}
+
+@media (max-width: 600px) {
+    .resumen-historial { grid-template-columns: 1fr; }
+    .numero { font-size: 64px; }
+}
+
+@media (max-width: 380px) {
+    .tarjetas { gap: 9px; }
+    .tarjeta { padding: 12px; }
+}
+</style>
+</head>
+
+<body>
+
+<main class="contenedor">
+
+<header>
+    <div class="marca">
+        <div class="logo">✿</div>
+        <div>
+            <h1>Violet Park</h1>
+            <p class="subtitulo">Asistente de estacionamiento · ESP32</p>
+        </div>
+    </div>
+
+    <div class="conexion" id="conexion">
+        <span class="punto"></span>
+        <span id="conexionTexto">Conectando...</span>
+    </div>
+</header>
+
+<section class="bienvenida">
+    <div>
+        <h2>¡Bienvenido a Violet Park! 💜</h2>
+        <p>Estaciona tu automóvil de reversa con ayuda de los sensores de proximidad.</p>
+    </div>
+    <div class="pasos">
+        <span>Verde: seguro</span>
+        <span>Amarillo: precaución</span>
+        <span>Rojo: alerta</span>
+    </div>
+</section>
+
+<div class="seccion-titulo">Asistente de estacionamiento</div>
+
+<section class="panel-estacionamiento">
+
+    <article class="panel">
+        <h3>Vista de estacionamiento</h3>
+
+        <div class="zona-estacionamiento" id="zonaAuto">
+
+            <div class="linea-pista"></div>
+
+            <div class="obstaculo"><span>OBSTÁCULO</span></div>
+
+            <div class="auto" id="auto">
+                <div class="sensor-rayos">
+                    <span class="rayo"></span>
+                    <span class="rayo"></span>
+                    <span class="rayo"></span>
+                </div>
+                <span class="rueda izquierda"></span>
+                <span class="rueda derecha"></span>
+                <span class="luz-auto izquierda"></span>
+                <span class="luz-auto derecha"></span>
+            </div>
+
+            <span class="texto-pista">Vista ilustrativa de reversa</span>
+
+        </div>
+    </article>
+
+    <article class="panel">
+        <h3>Distancia del obstáculo</h3>
+
+        <div class="numero">
+            <span id="distancia">--</span>
+            <span class="unidad">cm</span>
+        </div>
+
+        <p class="detalle" id="distanciaDetalle">
+            Esperando lectura del sensor...
+        </p>
+
+        <div class="barra-caja">
+            <div class="barra">
+                <span id="barraDistancia"></span>
+            </div>
+            <i class="marca-barra" style="left:3%"></i>
+            <i class="marca-barra" style="left:10%"></i>
+            <i class="marca-barra" style="left:20%"></i>
+            <div class="escala">
+                <span style="left:0">0</span>
+                <span style="left:20%">20</span>
+                <span style="left:50%">50</span>
+                <span style="left:100%">100 cm</span>
+            </div>
+        </div>
+
+        <div class="estado-distancia" id="estadoDistancia">
+            Esperando información
+        </div>
+
+        <div class="zonas">
+
+            <div class="fila-zona z-seguro" data-zona="seguro">
+                <i></i><span class="nombre">Distancia segura</span>
+                <span class="valor">Más de 20 cm</span>
+            </div>
+
+            <div class="fila-zona z-precaucion" data-zona="precaucion">
+                <i></i><span class="nombre">Precaución</span>
+                <span class="valor">11 a 20 cm</span>
+            </div>
+
+            <div class="fila-zona z-alerta" data-zona="alerta">
+                <i></i><span class="nombre">Alerta</span>
+                <span class="valor">Más de 3 hasta 10 cm</span>
+            </div>
+
+            <div class="fila-zona z-peligro" data-zona="peligro">
+                <i></i><span class="nombre">Peligro</span>
+                <span class="valor">3 cm o menos</span>
+            </div>
+
+        </div>
+    </article>
+
+</section>
+
+<div class="seccion-titulo">Estado de los componentes</div>
+
+<section class="tarjetas">
+
+    <article class="tarjeta led-blanco">
+        <div class="tarjeta-cabecera">
+            <span class="etiqueta">LED blanco</span>
+            <span class="icono">○</span>
+        </div>
+        <div class="estado-grande" id="blancoTexto">Apagado</div>
+        <p class="nota">Indicador del sensor táctil</p>
+        <div class="estado" id="blancoEstado">
+            <i></i><span>Sin contacto</span>
+        </div>
+    </article>
+
+    <article class="tarjeta led-verde">
+        <div class="tarjeta-cabecera">
+            <span class="etiqueta">LED verde</span>
+            <span class="icono">✦</span>
+        </div>
+        <div class="estado-grande" id="verdeTexto">Apagado</div>
+        <p class="nota">Distancia segura</p>
+        <div class="estado" id="verdeEstado">
+            <i></i><span>Sin distancia segura</span>
+        </div>
+    </article>
+
+    <article class="tarjeta led-amarillo">
+        <div class="tarjeta-cabecera">
+            <span class="etiqueta">LED amarillo</span>
+            <span class="icono">●</span>
+        </div>
+        <div class="estado-grande" id="amarilloTexto">Apagado</div>
+        <p class="nota">Indicador de precaución</p>
+        <div class="estado" id="amarilloEstado">
+            <i></i><span>Sin precaución</span>
+        </div>
+    </article>
+
+    <article class="tarjeta led-rojo">
+        <div class="tarjeta-cabecera">
+            <span class="etiqueta">LED rojo</span>
+            <span class="icono">●</span>
+        </div>
+        <div class="estado-grande" id="rojoTexto">Apagado</div>
+        <p class="nota">Alerta de proximidad</p>
+        <div class="estado" id="rojoEstado">
+            <i></i><span>Sin alerta</span>
+        </div>
+    </article>
+
+    <article class="tarjeta dispositivo">
+        <div class="tarjeta-cabecera">
+            <span class="etiqueta">Buzzer</span>
+            <span class="icono">♫</span>
+        </div>
+        <div class="estado-grande" id="buzzerTexto">Apagado</div>
+        <p class="nota">Alerta sonora de reversa</p>
+        <div class="estado" id="buzzerEstado">
+            <i></i><span>Sin sonido</span>
+        </div>
+    </article>
+
+    <article class="tarjeta dispositivo">
+        <div class="tarjeta-cabecera">
+            <span class="etiqueta">Sensor táctil</span>
+            <span class="icono">♡</span>
+        </div>
+        <div class="estado-grande" id="tactilTexto">Libre</div>
+        <p class="nota">Detección por contacto</p>
+        <div class="estado" id="tactilEstado">
+            <i></i><span>Esperando contacto</span>
+        </div>
+    </article>
+
+</section>
+
+<section class="panel-inferior">
+
+    <article class="panel">
+        <h3>Información del sistema</h3>
+
+        <div class="fila">
+            <span>Sensor ultrasónico</span>
+            <span class="valor" id="sensorEstado">Esperando datos</span>
+        </div>
+
+        <div class="fila">
+            <span>Estado del estacionamiento</span>
+            <span class="valor" id="alertaEstado">Sin información</span>
+        </div>
+
+        <div class="fila">
+            <span>Última actualización</span>
+            <span class="valor" id="actualizacion">--:--:--</span>
+        </div>
+    </article>
+
+    <article class="panel">
+        <h3>¿Cómo funciona Violet Park?</h3>
+
+        <div class="aviso">
+            <p>El sensor ultrasónico mide la distancia entre el automóvil y el obstáculo mientras se realiza la maniobra de reversa.</p>
+
+            <p>Cuando el automóvil se encuentra a más de 20 cm, se activa el LED verde. Al acercarse, se enciende el LED amarillo. Entre más se aproxima, el LED rojo parpadea y el buzzer emite sonidos. A 3 cm o menos, ambos permanecen activados continuamente.</p>
+
+            <p>El LED blanco indica cuando se detecta contacto con el sensor táctil.</p>
+        </div>
+    </article>
+
+</section>
+
+<!-- HISTORIAL -->
+
+<div class="seccion-titulo">Historial de estacionamiento</div>
+
+<section class="panel">
+
+    <h3>Registro de proximidad</h3>
+
+    <div class="resumen-historial">
+
+        <div class="resumen-card">
+            <span>Registros guardados</span>
+            <strong id="totalRegistros">0</strong>
+        </div>
+
+        <div class="resumen-card">
+            <span>Distancia mínima</span>
+            <strong id="distanciaMinima">-- cm</strong>
+        </div>
+
+        <div class="resumen-card">
+            <span>Última distancia registrada</span>
+            <strong id="ultimaDistancia">-- cm</strong>
+        </div>
+
+    </div>
+
+    <div class="historial-acciones">
+
+        <button class="boton-historial" onclick="cargarHistorial()">
+            ↻ Actualizar historial
+        </button>
+
+        <button class="boton-historial principal" onclick="exportarHistorial()">
+            ↓ Descargar CSV
+        </button>
+
+        <label class="filtro">
+            Mostrar
+            <select id="filtroEstado" onchange="pintarHistorial()">
+                <option value="">Todos los estados</option>
+                <option value="SEGURO">Seguro</option>
+                <option value="PRECAUCION">Precaución</option>
+                <option value="ALERTA">Alerta</option>
+                <option value="PELIGRO">Peligro</option>
+            </select>
+        </label>
+
+    </div>
+
+    <div class="tabla-contenedor">
+
+        <table class="tabla-historial">
+
+            <thead>
+                <tr>
+                    <th>Tiempo</th>
+                    <th>Distancia</th>
+                    <th>Estado</th>
+                    <th>LED rojo</th>
+                    <th>Buzzer</th>
+                    <th>Táctil</th>
+                </tr>
+            </thead>
+
+            <tbody id="tablaHistorial">
+                <tr>
+                    <td colspan="6" class="sin-registros">
+                        Cargando historial...
+                    </td>
+                </tr>
+            </tbody>
+
+        </table>
+
+    </div>
+
+    <p class="nota" style="margin-top:14px">
+        Los registros se almacenan en Firebase Realtime Database.
+        Se muestran los cambios de estado guardados por el ESP32.
+    </p>
+
+</section>
+
+<footer>
+    Violet Park · Proyecto de estacionamiento inteligente con ESP32
+</footer>
+
+</main>
+
+<script>
+
+// ======================================
+// CONFIGURACION FIREBASE
+// ======================================
+
+const FIREBASE_DATABASE =
+    "https://violet-park-default-rtdb.firebaseio.com";
+
+const RUTA_ACTUAL =
+    FIREBASE_DATABASE + "/violetPark/actual.json";
+
+const RUTA_HISTORIAL =
+    FIREBASE_DATABASE + "/violetPark/historial.json";
+
+
+// ELEMENTOS HTML
+
+const $ = id => document.getElementById(id);
+
+
+// HISTORIAL
+
+let registrosHistorial = [];
+
+
+// ======================================
+// CONSULTAR FIREBASE
+// ======================================
+
+async function consultarFirebase(ruta) {
+
+    const respuesta = await fetch(
+        ruta + "?t=" + Date.now(),
+        { cache: "no-store" }
+    );
+
+    if (!respuesta.ok) {
+        throw new Error("No se pudieron consultar los datos");
+    }
+
+    return await respuesta.json();
+}
+
+
+// ======================================
+// ESTADOS DE COMPONENTES
+// ======================================
+
+function ponerEstado(
+    id,
+    activo,
+    textoActivo,
+    textoInactivo,
+    tipo = ""
+) {
+
+    const elemento = $(id);
+
+    elemento.classList.remove(
+        "activo",
+        "alerta",
+        "precaucion"
+    );
+
+    if (activo) {
+        elemento.classList.add(tipo || "activo");
+    }
+
+    elemento.querySelector("span").textContent =
+        activo ? textoActivo : textoInactivo;
+
+    // Resalta la tarjeta completa cuando el componente está activo
+    elemento.closest(".tarjeta").classList.toggle("on", activo);
+}
+
+
+function actualizarLED(id, activo, nombre) {
+
+    $(id + "Texto").textContent =
+        activo ? "Activo" : "Apagado";
+
+    ponerEstado(
+        id + "Estado",
+        activo,
+        nombre,
+        "Apagado",
+        id === "amarillo" ? "precaucion" :
+        id === "rojo" ? "alerta" : "activo"
+    );
+}
+
+
+// Resalta la zona actual en la lista de rangos
+function marcarZona(nombre) {
+
+    document.querySelectorAll(".fila-zona").forEach(fila => {
+        fila.classList.toggle("actual", fila.dataset.zona === nombre);
+    });
+}
+
+
+// ======================================
+// ACTUALIZAR MONITOR EN TIEMPO REAL
+// ======================================
+
+async function actualizar() {
+
+    try {
+
+        const d = await consultarFirebase(RUTA_ACTUAL);
+
+        if (!d) {
+            throw new Error("No hay datos actuales en Firebase");
+        }
+
+        $("conexion").classList.add("online");
+
+        $("conexionTexto").textContent =
+            "Firebase conectado";
+
+        const distanciaValida =
+            d.distancia !== null &&
+            d.distancia !== undefined &&
+            Number.isFinite(Number(d.distancia));
+
+        const zona = $("zonaAuto");
+
+        if (!distanciaValida) {
+
+            $("distancia").textContent = "--";
+
+            $("distanciaDetalle").textContent =
+                "No se recibió una lectura válida";
+
+            $("barraDistancia").style.width = "0%";
+
+            $("barraDistancia").style.background = "#d7d2df";
+
+            $("estadoDistancia").textContent =
+                "Esperando una lectura del sensor";
+
+            $("sensorEstado").textContent = "Sin lectura";
+
+            $("alertaEstado").textContent = "Sin información";
+
+            $("auto").style.transform = "translateY(0px)";
+
+            zona.className = "zona-estacionamiento";
+
+            marcarZona(null);
+
+        } else {
+
+            const distancia = Number(d.distancia);
+
+            $("distancia").textContent =
+                distancia.toFixed(1);
+
+            $("sensorEstado").textContent = "Funcionando";
+
+            const porcentaje = Math.max(
+                0,
+                Math.min(100, distancia)
+            );
+
+            $("barraDistancia").style.width =
+                porcentaje + "%";
+
+            // El auto avanza hacia el obstáculo (hasta 140 px)
+            const avance = Math.max(
+                0,
+                Math.min(140, (100 - distancia) * 1.4)
+            );
+
+            $("auto").style.transform =
+                "translateY(-" + avance + "px)";
+
+            if (distancia > 20) {
+
+                zona.className =
+                    "zona-estacionamiento seguro";
+
+                $("barraDistancia").style.background =
+                    "#3fa57a";
+
+                $("distanciaDetalle").textContent =
+                    "El automóvil se encuentra a una distancia segura";
+
+                $("estadoDistancia").textContent =
+                    "Distancia segura";
+
+                $("alertaEstado").textContent = "Normal";
+
+                marcarZona("seguro");
+
+            } else if (distancia > 10) {
+
+                zona.className =
+                    "zona-estacionamiento precaucion";
+
+                $("barraDistancia").style.background =
+                    "#e3a92f";
+
+                $("distanciaDetalle").textContent =
+                    "El automóvil se está acercando al obstáculo";
+
+                $("estadoDistancia").textContent =
+                    "¡Precaución!";
+
+                $("alertaEstado").textContent =
+                    "Precaución";
+
+                marcarZona("precaucion");
+
+            } else if (distancia > 3) {
+
+                zona.className =
+                    "zona-estacionamiento alerta";
+
+                $("barraDistancia").style.background =
+                    "#e5576f";
+
+                $("distanciaDetalle").textContent =
+                    "¡Muy cerca! Reduce la velocidad";
+
+                $("estadoDistancia").textContent =
+                    "¡Alerta de proximidad!";
+
+                $("alertaEstado").textContent =
+                    "Alerta";
+
+                marcarZona("alerta");
+
+            } else {
+
+                zona.className =
+                    "zona-estacionamiento alerta";
+
+                $("barraDistancia").style.background =
+                    "#e5576f";
+
+                $("distanciaDetalle").textContent =
+                    "¡Detente! El obstáculo está demasiado cerca";
+
+                $("estadoDistancia").textContent =
+                    "¡PELIGRO! DETENERSE";
+
+                $("alertaEstado").textContent =
+                    "Peligro";
+
+                marcarZona("peligro");
+            }
+        }
+
+        // CUATRO LED
+
+        actualizarLED(
+            "blanco",
+            !!d.led_blanco,
+            "Contacto detectado"
+        );
+
+        actualizarLED(
+            "verde",
+            !!d.led_verde,
+            "Distancia segura"
+        );
+
+        actualizarLED(
+            "amarillo",
+            !!d.led_amarillo,
+            "Precaución"
+        );
+
+        actualizarLED(
+            "rojo",
+            !!d.led_rojo,
+            "Alerta activa"
+        );
+
+        // BUZZER
+
+        $("buzzerTexto").textContent =
+            d.buzzer ? "Activo" : "Apagado";
+
+        ponerEstado(
+            "buzzerEstado",
+            !!d.buzzer,
+            "Emitiendo sonido",
+            "Sin sonido",
+            "alerta"
+        );
+
+        // SENSOR TACTIL
+
+        $("tactilTexto").textContent =
+            d.tactil ? "Detectado" : "Libre";
+
+        ponerEstado(
+            "tactilEstado",
+            !!d.tactil,
+            "Hay contacto",
+            "Esperando contacto"
+        );
+
+        // HORA DEL ULTIMO ENVIO
+
+        if (d.actualizacion) {
+
+            $("actualizacion").textContent =
+                new Date(
+                    Number(d.actualizacion) * 1000
+                ).toLocaleTimeString("es-MX");
+
+        } else {
+
+            $("actualizacion").textContent = "--:--:--";
+        }
+
+    } catch (error) {
+
+        $("conexion").classList.remove("online");
+
+        $("conexionTexto").textContent =
+            "Sin conexión con Firebase";
+
+        $("sensorEstado").textContent =
+            "Revisar conexión";
+
+        console.log("Error de Firebase:", error);
+    }
+}
+
+
+// ======================================
+// HISTORIAL DE ESTACIONAMIENTO
+// ======================================
+
+async function cargarHistorial() {
+
+    const tabla = $("tablaHistorial");
+
+    try {
+
+        const datos = await consultarFirebase(RUTA_HISTORIAL);
+
+        // FIREBASE GUARDA EL HISTORIAL COMO OBJETO
+
+        registrosHistorial = datos
+            ? Object.values(datos).flat()
+            : [];
+
+        // ORDENAR POR FECHA
+
+        registrosHistorial.sort(
+            (a, b) => Number(a.segundos) - Number(b.segundos)
+        );
+
+        $("totalRegistros").textContent =
+            registrosHistorial.length;
+
+        if (registrosHistorial.length === 0) {
+
+            $("distanciaMinima").textContent = "-- cm";
+
+            $("ultimaDistancia").textContent = "-- cm";
+
+            tabla.innerHTML = `
+                <tr>
+                    <td colspan="6" class="sin-registros">
+                        Todavía no hay estacionamientos registrados.
+                    </td>
+                </tr>
+            `;
+
+            return;
+        }
+
+        // DISTANCIA MINIMA
+
+        const distancias = registrosHistorial
+            .map(registro => Number(registro.distancia))
+            .filter(Number.isFinite);
+
+        const minima = Math.min(...distancias);
+
+        $("distanciaMinima").textContent =
+            minima.toFixed(1) + " cm";
+
+        // ULTIMA DISTANCIA
+
+        const ultimo =
+            registrosHistorial[registrosHistorial.length - 1];
+
+        $("ultimaDistancia").textContent =
+            Number(ultimo.distancia).toFixed(1) + " cm";
+
+        // TABLA
+
+        pintarHistorial();
+
+    } catch (error) {
+
+        tabla.innerHTML = `
+            <tr>
+                <td colspan="6" class="sin-registros">
+                    No se pudo cargar el historial de Firebase.
+                    Comprueba la conexión.
+                </td>
+            </tr>
+        `;
+
+        console.log("Error de historial:", error);
+    }
+}
+
+
+// Dibuja la tabla (respeta el filtro por estado)
+
+function pintarHistorial() {
+
+    const tabla = $("tablaHistorial");
+
+    const filtro = $("filtroEstado").value;
+
+    const lista = registrosHistorial
+        .filter(r => !filtro || r.estado === filtro)
+        .slice()
+        .reverse();
+
+    if (registrosHistorial.length === 0) {
+        return;
+    }
+
+    if (lista.length === 0) {
+
+        tabla.innerHTML = `
+            <tr>
+                <td colspan="6" class="sin-registros">
+                    No hay registros con ese estado.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+    tabla.innerHTML = lista.map(registro => {
+
+        let clase = "seguro-h";
+
+        if (registro.estado === "PRECAUCION") {
+            clase = "precaucion-h";
+        }
+
+        if (registro.estado === "ALERTA") {
+            clase = "alerta-h";
+        }
+
+        if (registro.estado === "PELIGRO") {
+            clase = "peligro-h";
+        }
+
+        const fecha = new Date(
+            Number(registro.segundos) * 1000
+        );
+
+        const hora = Number.isNaN(fecha.getTime())
+            ? "--"
+            : fecha.toLocaleString("es-MX");
+
+        return `
+            <tr>
+                <td>${hora}</td>
+
+                <td>
+                    ${Number(registro.distancia).toFixed(1)} cm
+                </td>
+
+                <td>
+                    <span class="etiqueta-historial ${clase}">
+                        ${registro.estado}
+                    </span>
+                </td>
+
+                <td>
+                    ${registro.led_rojo ? "Activo" : "Apagado"}
+                </td>
+
+                <td>
+                    ${registro.buzzer ? "Activo" : "Apagado"}
+                </td>
+
+                <td>
+                    ${registro.tactil ? "Detectado" : "Libre"}
+                </td>
+            </tr>
+        `;
+
+    }).join("");
+}
+
+
+// ======================================
+// DESCARGAR HISTORIAL CSV
+// ======================================
+
+function exportarHistorial() {
+
+    if (registrosHistorial.length === 0) {
+
+        alert("No hay registros para descargar.");
+
+        return;
+    }
+
+    const encabezado = [
+        "Tiempo",
+        "Distancia",
+        "Estado",
+        "LED rojo",
+        "LED blanco",
+        "LED amarillo",
+        "LED verde",
+        "Buzzer",
+        "Tactil"
+    ];
+
+    const filas = registrosHistorial.map(r => [
+
+        new Date(
+            Number(r.segundos) * 1000
+        ).toLocaleString("es-MX"),
+
+        r.distancia,
+        r.estado,
+        r.led_rojo,
+        r.led_blanco,
+        r.led_amarillo,
+        r.led_verde,
+        r.buzzer,
+        r.tactil
+
+    ]);
+
+    // Entre comillas para que la fecha (con comas) no rompa columnas
+    const celda = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+
+    const contenido = [encabezado, ...filas]
+        .map(fila => fila.map(celda).join(","))
+        .join("\n");
+
+    const archivo = new Blob(
+        ["\uFEFF" + contenido],
+        { type: "text/csv;charset=utf-8;" }
+    );
+
+    const enlace = document.createElement("a");
+
+    enlace.href = URL.createObjectURL(archivo);
+
+    enlace.download = "historial_violet_park.csv";
+
+    enlace.click();
+
+    URL.revokeObjectURL(enlace.href);
+}
+
+
+// ======================================
+// INICIAR ACTUALIZACIONES
+// ======================================
+
+actualizar();
+
+cargarHistorial();
+
+setInterval(actualizar, 1000);
+
+setInterval(cargarHistorial, 5000);
+
+</script>
+
+</body>
+</html>
