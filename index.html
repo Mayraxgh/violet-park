@@ -229,7 +229,7 @@ header{align-items:flex-start;flex-direction:column}
 
         <div class="barra-caja">
             <div class="barra"><span id="barraDistancia"></span></div>
-            <i class="marca-barra" style="left:3%"></i>
+            <i class="marca-barra" style="left:5%"></i>
             <i class="marca-barra" style="left:10%"></i>
             <i class="marca-barra" style="left:20%"></i>
             <div class="escala">
@@ -247,7 +247,7 @@ header{align-items:flex-start;flex-direction:column}
             <svg id="grafica" viewBox="0 0 300 80" preserveAspectRatio="none" role="img" aria-label="Gráfica de distancia">
                 <line class="umbral" x1="0" x2="300" y1="64" y2="64"/>
                 <line class="umbral" x1="0" x2="300" y1="72" y2="72"/>
-                <line class="umbral" x1="0" x2="300" y1="77.6" y2="77.6"/>
+                <line class="umbral" x1="0" x2="300" y1="76" y2="76"/>
                 <polyline id="lineaGrafica" points=""/>
             </svg>
         </div>
@@ -255,8 +255,8 @@ header{align-items:flex-start;flex-direction:column}
         <div class="zonas">
             <div class="fila-zona z-seguro" data-zona="seguro"><i></i><span class="nombre">Distancia segura</span><span class="valor">Más de 20 cm</span></div>
             <div class="fila-zona z-precaucion" data-zona="precaucion"><i></i><span class="nombre">Precaución</span><span class="valor">11 a 20 cm</span></div>
-            <div class="fila-zona z-alerta" data-zona="alerta"><i></i><span class="nombre">Alerta</span><span class="valor">Más de 3 hasta 10 cm</span></div>
-            <div class="fila-zona z-peligro" data-zona="peligro"><i></i><span class="nombre">Peligro</span><span class="valor">3 cm o menos</span></div>
+            <div class="fila-zona z-alerta" data-zona="alerta"><i></i><span class="nombre">Alerta</span><span class="valor">5.1 a 10 cm</span></div>
+            <div class="fila-zona z-peligro" data-zona="peligro"><i></i><span class="nombre">Peligro</span><span class="valor">5 cm o menos</span></div>
         </div>
     </article>
 
@@ -326,7 +326,7 @@ header{align-items:flex-start;flex-direction:column}
         <h3>¿Cómo funciona Violet Park?</h3>
         <div class="aviso">
             <p>El sensor ultrasónico mide la distancia entre el automóvil y el obstáculo mientras se realiza la maniobra de reversa.</p>
-            <p>Cuando el automóvil se encuentra a más de 20 cm, se activa el LED verde. Al acercarse, se enciende el LED amarillo. Entre más se aproxima, el LED rojo parpadea y el buzzer emite sonidos. A 3 cm o menos, ambos permanecen activados continuamente.</p>
+            <p>Cuando el automóvil se encuentra a más de 20 cm, se activa el LED verde. Al acercarse, se enciende el LED amarillo. Entre más se aproxima, el LED rojo parpadea y el buzzer emite sonidos. A 5 cm o menos, ambos permanecen activados continuamente.</p>
             <p>El LED blanco indica cuando se detecta contacto con el sensor táctil.</p>
         </div>
     </article>
@@ -650,7 +650,7 @@ async function actualizar() {
                 $("alertaEstado").textContent = "Precaución";
                 marcarZona("precaucion");
 
-            } else if (distancia > 3) {
+            } else if (distancia > 5) {
 
                 zona.className = "zona-estacionamiento alerta";
                 $("barraDistancia").style.background = "#e5576f";
@@ -803,7 +803,7 @@ function escucharHistorial() {
 
     const recargar = () => {
         clearTimeout(espera);
-        espera = setTimeout(cargarHistorial, 400);
+        espera = setTimeout(cargarHistorial, 150);
     };
 
     const flujo = new EventSource(RUTA_HISTORIAL_VIVO);
@@ -866,7 +866,7 @@ cargarHistorial();
 escucharHistorial();
 
 setInterval(actualizar, 1000);
-setInterval(cargarHistorial, 10000);   // respaldo por si falla el aviso en vivo
+setInterval(cargarHistorial, 3000);   // respaldo por si falla el aviso en vivo
 
 </script>
 
